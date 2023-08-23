@@ -1,0 +1,166 @@
+service: build-note-practicle
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  stage: dev
+  runtime: python3.8
+  region: us-east-1
+  iamRoleStatements:
+
+  - Effect: Allow
+    Action:
+      - dynamodb:PutItem
+      - lambda:*
+    Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/notesdata"
+
+
+  - Effect: Allow
+    Action:
+      - dynamodb:Scan
+      - lambda:*
+    Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/notesdata"
+  
+  - Effect: Allow
+    Action:
+      - dynamodb:GetItem
+      - lambda:*
+    Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/notesdata"
+  
+  - Effect: Allow
+    Action:
+      - dynamodb:UpdateItem
+      - dynamodb:GetItem
+      - lambda:*
+    Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/notesdata"
+  
+  - Effect: Allow
+    Action:
+      - dynamodb:Query
+      - lambda:*
+    Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/notesdata/index/note_content"
+  
+  - Effect: Allow
+    Action:
+      - dynamodb:DeleteItem
+      - lambda:*
+    Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/notesdata"
+
+layers:
+  DependanceiesModule:
+    path: myLayer
+    description: python module dependanceies
+    compatibleRuntimes:
+      - python3.8
+    compatibleArchitectures:
+      - x86_64
+
+functions:
+
+  createjwttoken:
+    handler: authentication.login
+    layers:
+      - {Ref: DependanceiesModuleLambdaLayer }
+    events:
+      - http:
+          path: /login
+          method: post
+          cors: true
+
+  authenitcation:
+
+    handler: authentication.userauthentication
+    layers:
+      - {Ref: DependanceiesModuleLambdaLayer }
+
+  createnote:
+    handler: buildnote.createNote
+    events:
+      - http:
+          path: /createnote
+          method: post
+          # authorizer:
+          #   arn: arn:aws:lambda:us-east-1:263611611358:function:build-note-practicle-dev-authenitcation
+          #   resultTtlInSeconds: 0
+          #   identitySource: method.request.header.Authorization
+          # cors: true
+
+  getallnote:
+    handler: buildnote.listNotes 
+    events:
+      - http:
+          path: /getitems
+          method: get
+          # authorizer:
+          #   arn: arn:aws:lambda:us-east-1:263611611358:function:build-note-practicle-dev-authenitcation
+          # cors: true
+          
+  getSpecificnote:
+    handler: buildnote.getNote
+    events:
+      - http:
+          path: /getitem
+          method: get
+          # authorizer:
+          #   arn: arn:aws:lambda:us-east-1:263611611358:function:build-note-practicle-dev-authenitcation
+          # cors: true
+
+  updateNote:
+    handler: buildnote.updateNote
+    events:
+      - http:
+          path: /update
+          method: post
+          # authorizer:
+          #   arn: arn:aws:lambda:us-east-1:263611611358:function:build-note-practicle-dev-authenitcation
+          # cors: true
+
+  sortingNote:
+    handler: buildnote.sortingNote
+    events:
+      - http:
+          path: /sort
+          method: post
+          # authorizer:
+          #   arn: arn:aws:lambda:us-east-1:263611611358:function:build-note-practicle-dev-authenitcation
+          # cors: true
+
+  deleteNote:
+    handler: buildnote.deleteNote
+    events:
+      - http:
+          path: /deletenote
+          method: delete
+          # authorizer:
+          #   arn: arn:aws:lambda:us-east-1:263611611358:function:build-note-practicle-dev-authenitcation
+          # cors: true
+
+resources:
+  Resources:
+      AccountsTable:
+          Type: AWS::DynamoDB::Table
+          Properties:
+            TableName: notesdata
+            AttributeDefinitions:
+              - AttributeName: noteid
+                AttributeType: S
+              - AttributeName: content 
+                AttributeType: S
+            KeySchema:
+              - AttributeName: noteid
+                KeyType: HASH
+                
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+            GlobalSecondaryIndexes:
+              - IndexName: note_content
+                KeySchema:
+                  - AttributeName: content
+                    KeyType: HASH
+                    
+                Projection:
+                  ProjectionType: ALL 
+                ProvisionedThroughput:
+                  ReadCapacityUnits: 1
+                  WriteCapacityUnits: 1
